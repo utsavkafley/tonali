@@ -118,7 +118,7 @@ are part of the North Star but are **not** in scope yet and not yet dependencies
 
 # ═══════════════ CURRENT BUILD ═══════════════
 
-## Step 1 — The Metronome
+## Step 1 — The Metronome ✅ done
 
 A large, clickable metronome with a BPM slider, sitting on the foundational audio
 engine described above. This is the whole feature. Everything else waits.
@@ -126,8 +126,10 @@ engine described above. This is the whole feature. Everything else waits.
 ### What the user sees and does
 - A big, prominent, clickable metronome control — the visual centerpiece.
 - Tapping it the first time unlocks audio (satisfies autoplay policy) and starts
-  the click. Tapping again stops it.
-- A BPM slider (and a clear numeric readout) that changes tempo live while playing.
+  the click. Tapping again stops it. The big circle owns start/stop only — tempo
+  input lives in the pads (Step 2), keeping this control single-purpose and clean.
+- An editable numeric BPM readout flanked by −10 / +10 steppers, plus a fine slider.
+  All change tempo live while playing.
 - A visual beat indicator that pulses in sync with the audio click.
 - An accent on beat 1 (audible and visual), assuming 4/4 for now.
 
@@ -158,12 +160,121 @@ app/page.tsx             // mounts the metronome
 
 ---
 
+## Step 2 — Tap Pads (current)
+
+A compact **2×2 grid of pads**, tucked in the **top-right** corner, unlabelled.
+
+### Why they exist (their purpose)
+The pads are a deliberately dual-purpose surface, designed once and used twice:
+
+1. **Now — tap tempo.** The user listens to a song and taps any pad in time; the
+   app derives the BPM from the tap rhythm. This is the canonical, real-world way a
+   musician answers "what tempo is this?" so they can practice at it. Splitting tap
+   tempo onto its own surface keeps the big metronome circle single-purpose
+   (start/stop) — no overloaded gestures, no modes, no long-press.
+2. **Later — drum pads.** These same pads become **drum-sample triggers** you tap to
+   make sounds (see Sound Sourcing Strategy → samples for drums). The component is
+   built with a per-pad *voice slot* from day one, so attaching a sampler to each pad
+   is an upgrade, not a rewrite. The flash-on-hit feedback already pre-figures the
+   drum-pad feel.
+
+### Mode separation (ships WITH the drums, not before)
+Once pads make drum sounds, drumming freely must not nudge the BPM. So:
+
+- **Default: drum mode.** A pad hit plays its sample; no tempo side-effect.
+- **"Tap BPM" toggle** — a small control near the pads. Flip it on and the pads
+  switch to tempo mode (visibly highlighted so the mode is unmistakable); hits set
+  BPM via the existing `useTapTempo` hook and make no drum sound.
+- **Auto-revert (decided).** After the tempo settles — the same >2s "fresh
+  measurement" gap the detector already uses — the toggle flips back to drum mode on
+  its own. The user is never stranded in tempo mode; no manual toggle-off needed.
+- Implementation seam: the toggle only gates whether a pad hit routes to `tap()` or
+  to the sampler. `useTapTempo` is unchanged. **Not built yet** — there is only one
+  mode (tempo) until samples exist, so building the toggle now would be dead UI.
+
+### Behavior (tap tempo)
+- **Any pad** registers a tap; all four feed one shared tempo detector — drum across
+  them or hammer one, it doesn't matter.
+- BPM = 60000 / (rolling average of the last ~5 inter-tap intervals), with **outlier
+  rejection** (an interval wildly off the running median is discarded as a misfire).
+- A gap **> 2s** since the last tap **resets** to a fresh measurement.
+- Taps faster than 240 BPM (< 250ms apart) are debounced as accidental double-fires.
+- The BPM readout updates **live** as taps converge, so the user sees it lock in and
+  stops when it feels right — no fixed tap count required.
+- Pads **only set BPM**; they never start/stop playback. The big circle owns that.
+- Each pad **flashes** on hit (immediate feedback; previews the future drum feel).
+- A pad press also unlocks audio (it's a valid user gesture), so the engine is ready.
+
+### Files this step touches
+```
+lib/audio/useTapTempo.ts // rolling-average tap-tempo hook (timing math, sets BPM)
+components/PadGrid.tsx    // the 2×2 grid + Pad (per-pad voice slot stubbed for drums)
+app/page.tsx             // mounts PadGrid in the top-right corner
+```
+
+### Done when
+- Tapping any pad in time to a song converges on the correct BPM, shown live.
+- Outliers and stray double-taps don't yank the tempo; a long gap starts fresh.
+- Pads visibly flash on hit and never start/stop the metronome.
+- Component structure leaves a clean seam to attach drum samples per pad later.
+
+---
+
+## Step 3 — Metronome: meter, stress & subdivision (current)
+
+Expands the metronome with a control row below it: choose how many beats per bar,
+stress specific beat(s), and subdivide the beat — while seeing which beat is playing.
+
+### What the user sees and does
+- **Interactive beat row** (replaces the plain beat dots). One cell per beat; the
+  cell does double duty:
+  - **Indicator** — the currently-playing beat highlights as the transport advances.
+  - **Stress editor** — click any cell to toggle its accent on/off. Stress one beat,
+    two, or however many; accented cells get the filled/orange look.
+- **Beats-per-bar stepper** (`− N +`) — set the number of beats per bar (3, 4, 5, 6…).
+  The accent map resizes to match (beat 1 stays stressed by default).
+- **Subdivision selector** — quarter / eighth / triplet / sixteenth. Picking one
+  changes how each beat is chopped up; the in-between clicks play softer.
+
+### Behavior
+- The click now has **three levels**: **stressed** beat, **normal** beat, and a
+  quieter **subdivision** click. (A future **muted** beat is an easy 4th level — the
+  accent map generalizes to it; not built now.)
+- Stress, beats-per-bar **and subdivision** all apply **live** (read per tick) with
+  no reschedule. Clicks are scheduled on a fine fixed grid (12 ticks/beat, which
+  evenly contains quarter/eighth/triplet/sixteenth); each subdivision just gates which
+  grid ticks click. No rescheduling means no mid-play glitch when switching feels.
+  Beat detection is derived from absolute transport ticks, not a counter.
+- Default: 4 beats, beat 1 stressed, quarter-note subdivision (i.e. today's behavior).
+- Swing/shuffle subdivision is intentionally deferred to the musical-expansion work
+  (it ties into the `Transport.swing` we already wired). Step 3 ships the plain set.
+
+### Files this step touches
+```
+lib/store/playback.ts    // beatsPerBar (mutable), accents[], subdivision + setters
+lib/audio/metronome.ts   // 3-level click voice; subdivision-aware tick scheduling
+components/BeatRow.tsx    // interactive beat cells: indicator + stress toggle
+components/MeterControls.tsx // beats-per-bar stepper + subdivision selector
+components/Metronome.tsx  // wires the new row; reschedules on subdivision change
+```
+
+### Done when
+- Clicking beat cells toggles their accent and you hear the stress shift live.
+- The beats-per-bar stepper changes the meter and the row resizes correctly.
+- Each subdivision (1/2/3/4 per beat) clicks at the right rate with softer in-betweens
+  and stays aligned to the main beats.
+- The playing-beat indicator tracks correctly across meters and subdivisions.
+
+---
+
 ## Backlog (the destination — not scheduled, not designed in detail yet)
 
 Kept here so we don't lose the vision. We pull from this one item at a time.
 
 - Swing/groove slider (engine already supports it)
-- Drum engine with real samples + genre-aware patterns (shuffle, rock, funk, jazz, bossa)
+- Drum engine with real samples + genre-aware patterns (shuffle, rock, funk, jazz,
+  bossa). Bundles the pad "Tap BPM" mode toggle (auto-revert) so drumming the pads
+  doesn't nudge the tempo — see Step 2 → Mode separation.
 - Chord/harmony playback (comped chords you can actually jam over) — sonically the
   biggest jump from "tool" to "experience"
 - Bar grid / chord chart with a hardcoded 12-bar blues
@@ -182,6 +293,20 @@ Kept here so we don't lose the vision. We pull from this one item at a time.
 
 ## Living-Document Changelog
 
+- **v6** — Defined + built Step 3 (metronome expansion): interactive beat row
+  (indicator + per-beat stress), beats-per-bar stepper, and subdivision selector
+  (quarter/eighth/triplet/sixteenth). Click voice gained a 3rd "subdivision" level.
+  Scheduler clicks on a fine fixed 12-ticks/beat grid and gates per subdivision, so
+  subdivision/meter/stress all apply live with no reschedule (fixes the mid-play
+  glitch when changing subdivision). Swing/shuffle subdivision deferred to musical
+  expansion. Pushed as one "Metronome expansion" commit.
+- **v5** — Decided pad mode separation: a small "Tap BPM" toggle (auto-revert after
+  the >2s gap) will gate drum-mode vs tempo-mode on the pads. Documented to ship with
+  the drum samples, not before (avoids dead UI). `useTapTempo` stays unchanged.
+- **v4** — Defined Step 2 (Tap Pads). A 2×2 unlabelled pad grid in the top-right,
+  dual-purpose: tap tempo now, drum-sample triggers later (per-pad voice slot
+  designed in from the start). Tap tempo moved off the big circle onto the pads so
+  start/stop stays single-purpose. Reverted the big-button tap-tempo experiment.
 - **v3** — Built Step 1 (metronome). Scaffolded Next.js 16 (App Router, TS,
   Tailwind v4) + Tone.js + Zustand. Implemented the audio engine (`engine.ts`),
   metronome scheduling with swappable click voice (`metronome.ts`), playback store,
