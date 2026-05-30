@@ -17,11 +17,13 @@ import {
   stopTransport,
 } from "@/lib/audio/engine";
 import { disposeMetronome } from "@/lib/audio/metronome";
+import { stopProgressionClock } from "@/lib/audio/progressionClock";
 import { usePlayback } from "@/lib/store/playback";
 import { useSession, LAYERS, LAYER_META, type LayerId } from "@/lib/store/session";
 import { Metronome } from "@/components/Metronome";
 import { Fretboard } from "@/components/Fretboard";
 import { FretboardControls } from "@/components/FretboardControls";
+import { ChordChart } from "@/components/ChordChart";
 
 export function PracticeSurface() {
   const focus = useSession((s) => s.focus);
@@ -35,6 +37,7 @@ export function PracticeSurface() {
     });
     return () => {
       unsub();
+      stopProgressionClock();
       stopTransport();
       disposeMetronome();
     };
@@ -68,6 +71,7 @@ function FocusedLayer({ focus }: { focus: LayerId }) {
     return (
       <div className="flex w-full flex-col items-center gap-8">
         <FretboardControls />
+        <ChordChart />
         <Fretboard />
       </div>
     );

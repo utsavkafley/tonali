@@ -6,8 +6,8 @@
  * markers where the current key+scale lands. Right-handed by default (nut left); a left
  * handedness flips the fret order.
  */
-import { useMemo, useState } from "react";
-import { useHarmony } from "@/lib/store/harmony";
+import { useMemo, useRef, useState } from "react";
+import { useHarmony, FRET_MAX } from "@/lib/store/harmony";
 import { buildFretboardContext, type NoteRole } from "@/lib/theory/scales";
 import {
   fretboardMarkers,
@@ -50,13 +50,29 @@ const NUM_H = 30;
 const R = 13;
 
 export function Fretboard() {
-  const { root, scale, tuning, handedness, fromFret, toFret, showDegrees, chordRoot, chordType } =
-    useHarmony();
+  const {
+    root, scale, tuning, handedness, fromFret, toFret, showDegrees,
+    chordRoot, chordType, playSteps, currentPlayIndex, setFretWindow,
+  } = useHarmony();
   const [hovered, setHovered] = useState<string | null>(null);
+  const [activeHandle, setActiveHandle] = useState<"from" | "to" | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const dragRef = useRef<{ which: "from" | "to"; startX: number; from: number; to: number } | null>(
+    null,
+  );
+
+  // Active chord: current playStep (manual or transport), else standalone chord.
+  const activeChord =
+    playSteps.length > 0
+      ? playSteps[Math.min(currentPlayIndex, playSteps.length - 1)].chord
+      : chordRoot
+        ? { root: chordRoot, type: chordType }
+        : null;
 
   const context = useMemo(
-    () => buildFretboardContext(root, scale, chordRoot ? { root: chordRoot, type: chordType } : null),
-    [root, scale, chordRoot, chordType],
+    () => buildFretboardContext(root, scale, activeChord ?? null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [root, scale, activeChord?.root, activeChord?.type],
   );
   const markers = useMemo(
     () => fretboardMarkers(tuning, fromFret, toFret, context),
@@ -80,9 +96,35 @@ export function Fretboard() {
   // String 0 = low E at the top, high E at the bottom.
   const yString = (s: number) => PAD_TOP + (strings - 1 - s) * STRING_GAP;
   const yMid = PAD_TOP + ((strings - 1) * STRING_GAP) / 2;
+  const boardTop = PAD_TOP;
+  const boardBottom = PAD_TOP + (strings - 1) * STRING_GAP;
+
+  // Drag the window edges to reframe the visible frets (replaces the sliders).
+  const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+  const onHandleDown = (which: "from" | "to") => (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { which, startX: e.clientX, from: fromFret, to: toFret };
+    setActiveHandle(which);
+  };
+  const onHandleMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!d || !rect) return;
+    const pxPerCell = (rect.width / width) * CELL_W;
+    const delta = Math.round((e.clientX - d.startX) / pxPerCell);
+    if (d.which === "from") setFretWindow(clamp(d.from + delta, 0, d.to - 1), d.to);
+    else setFretWindow(d.from, clamp(d.to + delta, d.from + 1, FRET_MAX));
+  };
+  const onHandleUp = (e: React.PointerEvent) => {
+    dragRef.current = null;
+    setActiveHandle(null);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+  };
 
   return (
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${width} ${height}`}
       className="h-auto w-full max-w-3xl text-foreground"
       role="img"
@@ -191,6 +233,53 @@ export function Fretboard() {
             >
               {label}
             </text>
+          </g>
+        );
+      })}
+
+      {/* Window edge handles — grab either end to reframe the visible frets. */}
+      {([
+        { which: "from" as const, edgeX: PAD_X },
+        { which: "to" as const, edgeX: PAD_X + cols * CELL_W },
+      ]).map(({ which, edgeX }) => {
+        const active = activeHandle === which;
+        return (
+          <g
+            key={`handle-${which}`}
+            style={{ cursor: "ew-resize", touchAction: "none" }}
+            onPointerDown={onHandleDown(which)}
+            onPointerMove={onHandleMove}
+            onPointerUp={onHandleUp}
+            onPointerEnter={() => !dragRef.current && setActiveHandle(which)}
+            onPointerLeave={() => !dragRef.current && setActiveHandle(null)}
+          >
+            <rect
+              x={edgeX - 10}
+              y={boardTop - 10}
+              width={20}
+              height={boardBottom - boardTop + 20}
+              fill="transparent"
+            />
+            <rect
+              x={edgeX - 2}
+              y={boardTop - 6}
+              width={4}
+              height={boardBottom - boardTop + 12}
+              rx={2}
+              fill={ACCENT}
+              opacity={active ? 0.9 : 0.2}
+            />
+            {active && (
+              <text
+                x={edgeX}
+                y={boardTop - 12}
+                textAnchor="middle"
+                fontSize={13}
+                fill={ACCENT}
+              >
+                ↔
+              </text>
+            )}
           </g>
         );
       })}

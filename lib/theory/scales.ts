@@ -103,6 +103,19 @@ export const CHORD_TYPES: { value: string; label: string }[] = [
 
 export type ChordChoice = { root: string; type: string };
 
+/** A measure: one or more chords sharing the bar. */
+export type Bar = ChordChoice[];
+
+/** Pretty display symbol, e.g. {root:"A",type:"m7b5"} → "Am7♭5". */
+export function chordLabel(c: ChordChoice): string {
+  return `${c.root}${c.type}`.replace("b5", "♭5");
+}
+
+/** Raw, re-parseable symbol (no prettifying), e.g. "Am7b5". */
+export function chordText(c: ChordChoice): string {
+  return `${c.root}${c.type}`;
+}
+
 /** A note as shown on the fretboard, with its role relative to the current context. */
 export type NoteRole = "root" | "chordRoot" | "chordTone" | "scaleTone";
 export type DisplayNote = { name: string; chroma: number; degree: string; role: NoteRole };

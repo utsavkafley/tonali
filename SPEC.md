@@ -122,6 +122,14 @@ shows its theory. `activePracticeId` highlights it; any manual edit de-highlight
 practices shown as teasers. A "Learn" section holds reference theory.
 → `lib/practice/{types,rhythm,index}.ts`, `store/playback.ts`, `PracticePanel.tsx`
 
+**Step 9 — Progression + bar grid (Chords pillar, slice 2).** Load a **progression** (preset
+menu, transposed into the current key: Pop I–V–vi–IV, 50s, ii–V–I, 12-bar blues) or build one
+(edit the selected bar's chord, + Bar, remove ×, Clear). A clickable **bar grid** shows the
+chords; selecting a bar sets `currentChordIndex`, and the fretboard highlights *that* chord's
+tones. Manual selection for now — transport-driven advance + looping come in slice 3.
+→ `lib/theory/progressions.ts`, `lib/theory/scales.ts` (chordLabel), `lib/store/harmony.ts`,
+`BarGrid.tsx`, `FretboardControls.tsx`, `PracticeSurface.tsx`
+
 **Step 8 — Chord-tone highlighting (Chords pillar, slice 1).** A **chord picker** (root +
 quality) on the Fretboard. With a chord active the board shows three tiers: **chord root**
 (accent), **chord tones** (solid fill), **passing/scale tones** (outlined) — the signature
@@ -195,6 +203,30 @@ audition it).
 
 Not now — do not get distracted. Captured so we don't lose it; revisit once the Chords pillar
 has chord context + progression playback to hang it on.
+
+---
+
+## Chord-Chart Mini-Syntax (proposed — a tiny chart markup)
+
+A lightweight text language for the progression input — mostly just real chart notation:
+
+- `|` = barline · space = multiple chords in a bar (existing).
+- **newline** = new **system** (user-controlled line breaks).
+- `|: … :|` = **repeat section** (draws repeat signs around it).
+- `:|×2` / `:|x3` = that section **repeats N times**.
+- The whole chart still **loops implicitly** (it's a backing); `|: :|` adds *inner* sectional
+  repeats on top.
+
+Example:
+```
+A7 | A7 | A7 | A7
+D7 | D7 | A7 | A7
+|: E7 | D7 | A7 | E7 :|×2
+```
+
+Scope: input becomes a textarea; model grows to carry systems + repeat ranges with counts.
+**Now** = render systems + repeat brackets + ×N labels. **Slice 3** = playback honors the
+counts. **Deferred** = nested repeats.
 
 ---
 
@@ -284,6 +316,23 @@ fretboard/chords and show key/scale/chord-tone theory.
 
 ## Changelog
 
+- **v23** — Built mini-syntax (textarea, newline=system, `|: … :|×N` repeat sections) +
+  Slice 3 (progression clock via `Tone.Part`, loops via playSteps). Chart model is now
+  `ChartData { systems: SystemLine[] }` with `PlayStep[]` for scheduling. Repeat sections
+  render with sign + ×N label + live rep counter (e.g. "2/3"). Play Progression button on
+  fretboard view. No implicit outer loop.
+- **v22** — Chord chart now lays out 4 bars per **system** (line) — the canonical grid (12-bar
+  blues reads as 4×3) — with barlines between measures and repeat signs bracketing the chart.
+- **v21** — Progression chord-chart upgrade: fixed the preset dropdown (controlled value,
+  shows Custom once edited — no flicker); replaced the bar grid with a real chart (barlines +
+  repeat signs) and free-text entry (`C G | Am F`); progression model is now `Bar[]` to
+  support **multiple chords per bar**; selection is a flat chord index. Removed BarGrid.
+- **v20** — Fretboard cohesion + UX: Key now transposes the loaded progression (shared
+  anchor); loading a progression sets a suggested soloing scale. Replaced the fret-window
+  sliders with drag handles on the board edges (↔ on grab; default 0–12).
+- **v19** — Built Step 9 (Chords pillar slice 2): progression presets (transposed to key) +
+  custom bar editing, clickable bar grid driving `currentChordIndex`, fretboard reflects the
+  selected bar's chord. Manual selection; transport advance/looping deferred to slice 3.
 - **v18** — Sharpened "The Wind" lick-guide idea with the user's decisions: toggleable
   guidance (on by default), swipe-typing squiggle whose shape encodes articulation
   (bend/vibrato/slide/hammer), curated transpose-invariant lick templates per scale type
