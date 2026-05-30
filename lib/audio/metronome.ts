@@ -51,6 +51,7 @@ function createSynthClick(): ClickVoice {
 export interface MetronomeConfig {
   beatsPerBar: number;
   accents: boolean[];
+  mutes: boolean[];
   subdivision: Subdivision;
 }
 
@@ -60,48 +61,62 @@ export type OnBeat = (beatInBar: number) => void;
  * Clicks are scheduled on a fine fixed grid of 12 ticks-per-beat. That grid evenly
  * contains every subdivision we offer — quarter (÷12), eighth (÷6), triplet (÷4),
  * sixteenth (÷3) — so changing subdivision never reschedules: we just gate which
- * grid ticks actually click. No reschedule means no mid-play glitch (SPEC Step 3).
+ * grid ticks actually click (SPEC Step 3).
+ *
+ * The grid position is tracked by a STEP COUNTER, not derived from the callback time.
+ * Swing nudges the callback `time` later (Tone shifts off-beats) without moving the
+ * tick source, so inverting time→ticks would mis-detect the beat. The counter is
+ * swing-immune: we only use `time` to place the sound at its (swung) moment.
  */
 const GRID_PER_BEAT = 12;
 
 let voice: ClickVoice | null = null;
 let scheduleId: number | null = null;
+let step = 0;
 
 /**
- * Schedule clicks on the fine grid. Does NOT start the transport (the engine owns
- * that). Idempotent: clears any prior schedule first, so StrictMode double-invoke
- * can't double the clicks.
+ * Schedule clicks on the fine grid, anchored at transport position 0 (the engine starts
+ * the transport from 0). Idempotent: clears any prior schedule first, so StrictMode
+ * double-invoke can't double the clicks.
  *
- * Pass a `getConfig` getter (not a snapshot) so subdivision, beats-per-bar and stress
- * all take effect live, with no rescheduling.
+ * Pass a `getConfig` getter (not a snapshot) so subdivision, beats-per-bar, stress and
+ * mutes all take effect live, with no rescheduling.
  */
 export function startMetronome(getConfig: () => MetronomeConfig, onBeat: OnBeat): void {
   stopMetronome();
   if (!voice) voice = createSynthClick();
 
   const t = getTransport();
-  const ppq = t.PPQ; // ticks per quarter (= per beat)
-  const gridTicks = Math.round(ppq / GRID_PER_BEAT);
+  const gridTicks = Math.round(t.PPQ / GRID_PER_BEAT);
+  step = 0;
 
-  scheduleId = t.scheduleRepeat((time) => {
-    const cfg = getConfig();
-    const ticks = Math.round(t.getTicksAtTime(time));
-    const tickInBeat = ((ticks % ppq) + ppq) % ppq;
+  scheduleId = t.scheduleRepeat(
+    (time) => {
+      const idx = step++;
+      const cfg = getConfig();
 
-    // Does this grid tick land on a click for the current subdivision?
-    const ticksPerClick = ppq / cfg.subdivision; // 1→ppq, 2→ppq/2, 3→ppq/3, 4→ppq/4
-    if (tickInBeat % ticksPerClick !== 0) return;
+      const gridInBeat = idx % GRID_PER_BEAT; // 0..11 within the current beat
+      const gridPerClick = GRID_PER_BEAT / cfg.subdivision; // 12/6/4/3
+      if (gridInBeat % gridPerClick !== 0) return; // not a click for this subdivision
 
-    if (tickInBeat === 0) {
-      const beatInBar = Math.round(ticks / ppq) % cfg.beatsPerBar;
-      const level: ClickLevel = cfg.accents[beatInBar] ? "strong" : "normal";
-      voice!.play(time, level);
-      // Paint the visual pulse in sync with the audio (SPEC §C: no separate timer).
-      getDraw().schedule(() => onBeat(beatInBar), time);
-    } else {
-      voice!.play(time, "sub");
-    }
-  }, `${gridTicks}i`);
+      const beatInBar = Math.floor(idx / GRID_PER_BEAT) % cfg.beatsPerBar;
+      const isMainBeat = gridInBeat === 0;
+
+      // The indicator advances on every main beat — even muted ones (you still see it).
+      if (isMainBeat) getDraw().schedule(() => onBeat(beatInBar), time);
+
+      if (cfg.mutes[beatInBar]) return; // silent beat: no sound (gap-click)
+
+      if (isMainBeat) {
+        const level: ClickLevel = cfg.accents[beatInBar] ? "strong" : "normal";
+        voice!.play(time, level);
+      } else {
+        voice!.play(time, "sub");
+      }
+    },
+    `${gridTicks}i`,
+    0,
+  );
 }
 
 /** Clear the scheduled clicks. Safe to call when nothing is scheduled. */

@@ -8,7 +8,6 @@
  * measurement. Sets BPM live (store + engine); never touches playback.
  */
 import { useCallback, useRef } from "react";
-import { setBpm as setEngineBpm } from "@/lib/audio/engine";
 import { usePlayback } from "@/lib/store/playback";
 
 /** A tap further apart than this starts a fresh measurement. */
@@ -56,7 +55,6 @@ export function useTapTempo() {
     const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
     const bpm = Math.round(60000 / avg);
 
-    usePlayback.getState().setBpm(bpm); // store clamps to range
-    setEngineBpm(usePlayback.getState().bpm); // apply clamped value live
+    usePlayback.getState().setBpm(bpm); // store clamps; subscription pushes it live
   }, []);
 }

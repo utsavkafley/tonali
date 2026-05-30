@@ -9,6 +9,10 @@ import type { Domain, Practice } from "@/lib/practice/types";
 const accents = (beats: number, ...on: number[]): boolean[] =>
   Array.from({ length: beats }, (_, i) => on.includes(i));
 
+/** Mute map of `beats` length with the given (0-indexed) beats silenced. */
+const mutes = (beats: number, ...off: number[]): boolean[] =>
+  Array.from({ length: beats }, (_, i) => off.includes(i));
+
 const practices: Practice[] = [
   // ── Foundations ──
   {
@@ -117,29 +121,43 @@ const practices: Practice[] = [
     rhythm: { bpm: 55, beatsPerBar: 4, subdivision: 2, accents: accents(4, 1, 3) },
   },
 
-  // ── Locked (shown as teasers; unlock when the mechanic lands) ──
+  // ── Feels (now unlocked) ──
   {
     id: "shuffle",
     domain: "rhythm",
-    group: "Locked",
+    group: "Meters & Feels",
     name: "Shuffle / Swing",
     trains: "Swung eighths",
     blurb:
-      "The long-short bounce of blues and jazz. Needs the swing engine before the click can lay back the off-beats for you.",
-    tip: "Until then: approximate it with Triplets and play on the 1st and 3rd of each.",
-    requires: "swing",
+      "The long-short bounce of blues and jazz. With swing on, the off-beat 'and' lays back toward the triplet — the click does the bounce so your hands can feel it.",
+    tip: "Play eighths along with it. Feel the lazy 'and' — long, then short.",
+    rhythm: {
+      bpm: 90,
+      beatsPerBar: 4,
+      subdivision: 2,
+      accents: accents(4, 1, 3),
+      swing: 0.6,
+    },
   },
   {
     id: "gap-click",
     domain: "rhythm",
-    group: "Locked",
+    group: "Pocket",
     name: "Gap-Click (drop beats)",
     trains: "Keep time without help",
     blurb:
-      "The click drops out for whole beats (or bars) and you must keep the time yourself, then check against its return. The single best test of your internal clock.",
-    tip: "Needs muted beats. This is the drill that proves whether YOU keep time.",
-    requires: "mutedBeats",
+      "The click sounds only on beat 1; beats 2–4 are silent. You keep the time yourself and check that beat 1 still lands with the click. The single best test of your internal clock.",
+    tip: "Watch the indicator pass the silent beats — but don't lean on it. Feel them.",
+    rhythm: {
+      bpm: 80,
+      beatsPerBar: 4,
+      subdivision: 1,
+      accents: accents(4, 0),
+      mutes: mutes(4, 1, 2, 3),
+    },
   },
+
+  // ── Locked (shown as teasers; unlock when the mechanic lands) ──
   {
     id: "clave",
     domain: "rhythm",
@@ -179,6 +197,14 @@ export const rhythmDomain: Domain = {
     {
       heading: "Slow is harder (and better)",
       body: "Low tempos expose every timing flaw because you must feel the long gaps. If a passage is clean slow, speed comes easily. Rushing fast and sloppy teaches your hands the wrong thing.",
+    },
+    {
+      heading: "Drop beats to test yourself",
+      body: "Click a beat a second time to mute it. With beats silenced, the metronome stops keeping time FOR you and starts testing whether YOU can — keep the pulse through the gaps and check you're still locked when the click returns. The fastest way to build a real internal clock.",
+    },
+    {
+      heading: "Swing makes it bounce",
+      body: "Swing delays the off-beat 'and' so straight eighths lean toward a triplet — the long-short shuffle of blues and jazz. Turn it up gradually and play eighths along: you'll feel the lazy bounce that 'straight' time doesn't have.",
     },
   ],
 };

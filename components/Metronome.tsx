@@ -14,6 +14,8 @@ import {
   configureTransport,
   startTransport,
   stopTransport,
+  setBpm as setEngineBpm,
+  setSwing as setEngineSwing,
 } from "@/lib/audio/engine";
 import {
   startMetronome,
@@ -29,7 +31,12 @@ import { MeterControls } from "@/components/MeterControls";
 // Stable getters that read live state — no props/hooks, so they live at module scope.
 const getConfig = (): MetronomeConfig => {
   const s = usePlayback.getState();
-  return { beatsPerBar: s.beatsPerBar, accents: s.accents, subdivision: s.subdivision };
+  return {
+    beatsPerBar: s.beatsPerBar,
+    accents: s.accents,
+    mutes: s.mutes,
+    subdivision: s.subdivision,
+  };
 };
 const onBeat = (beat: number) => usePlayback.getState().setCurrentBeat(beat);
 
@@ -39,12 +46,21 @@ export function Metronome() {
   const currentBeat = usePlayback((s) => s.currentBeat);
 
   // Clean teardown on unmount: no ghost schedules or leaked nodes (SPEC §B).
-  // Subdivision/meter/stress all apply live via getConfig — no reschedule needed.
+  // Subdivision/meter/stress/mutes all apply live via getConfig — no reschedule needed.
   useEffect(() => {
     return () => {
       stopTransport();
       disposeMetronome();
     };
+  }, []);
+
+  // Single source of truth → engine: push tempo & swing whenever they change (covers
+  // manual edits, tap tempo, and practice presets alike).
+  useEffect(() => {
+    return usePlayback.subscribe((s, prev) => {
+      if (s.bpm !== prev.bpm) setEngineBpm(s.bpm);
+      if (s.swing !== prev.swing) setEngineSwing(s.swing);
+    });
   }, []);
 
   async function toggle() {
@@ -60,7 +76,7 @@ export function Metronome() {
       return;
     }
 
-    configureTransport({ bpm: s.bpm, timeSignature: [s.beatsPerBar, 4] });
+    configureTransport({ bpm: s.bpm, timeSignature: [s.beatsPerBar, 4], swing: s.swing });
     startMetronome(getConfig, onBeat);
     startTransport();
     s.setPlaying(true);

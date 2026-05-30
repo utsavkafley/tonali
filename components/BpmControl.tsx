@@ -5,7 +5,6 @@
  * fine slider. All paths apply live mid-playback via the engine, no restart.
  */
 import { useState } from "react";
-import { setBpm as setEngineBpm } from "@/lib/audio/engine";
 import { usePlayback, BPM_MIN, BPM_MAX } from "@/lib/store/playback";
 
 export function BpmControl() {
@@ -15,9 +14,9 @@ export function BpmControl() {
   // Local draft while the user is typing; committed (clamped) on blur/Enter.
   const [draft, setDraft] = useState<string | null>(null);
 
+  // The store→engine subscription (in Metronome) pushes the new tempo live.
   function commit(value: number) {
     setBpm(value); // store clamps
-    setEngineBpm(usePlayback.getState().bpm); // apply the clamped value live
   }
 
   function step(delta: number) {

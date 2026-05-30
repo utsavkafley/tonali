@@ -21,6 +21,8 @@ export type RhythmPreset = {
   beatsPerBar: number;
   subdivision: Subdivision;
   accents: boolean[];
+  mutes?: boolean[]; // silent beats (gap-click); default none
+  swing?: number; // 0..1; default 0
 };
 
 interface PlaybackState {
@@ -32,8 +34,12 @@ interface PlaybackState {
   beatsPerBar: number;
   /** Per-beat stress map; length === beatsPerBar. true = accented. */
   accents: boolean[];
+  /** Per-beat mute map; length === beatsPerBar. true = silent (gap-click). */
+  mutes: boolean[];
   /** Clicks per beat. */
   subdivision: Subdivision;
+  /** Swing amount, 0..1 (0 = straight). Swings the eighth-note off-beats. */
+  swing: number;
   /** Current beat within the bar, 0-indexed. -1 = idle (no pulse). */
   currentBeat: number;
   /** Id of the active practice preset, or null once the user customizes off it. */
@@ -43,8 +49,10 @@ interface PlaybackState {
   setPlaying: (playing: boolean) => void;
   setBpm: (bpm: number) => void;
   setBeatsPerBar: (n: number) => void;
-  toggleAccent: (index: number) => void;
+  /** Cycle a beat: normal → stressed → muted → normal. */
+  cycleBeat: (index: number) => void;
   setSubdivision: (sub: Subdivision) => void;
+  setSwing: (swing: number) => void;
   setCurrentBeat: (beat: number) => void;
   /** Apply a Rhythm practice preset atomically and mark it active. */
   applyPreset: (id: string, preset: RhythmPreset) => void;
@@ -52,10 +60,15 @@ interface PlaybackState {
 
 const clampBpm = (bpm: number) => Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(bpm)));
 const clampBeats = (n: number) => Math.min(BEATS_MAX, Math.max(BEATS_MIN, Math.round(n)));
+const clampSwing = (s: number) => Math.min(1, Math.max(0, s));
 
-/** Build an accent map of the given length, preserving prior values; beat 1 defaults on. */
+/** Resize the accent map, preserving prior values; beat 1 defaults stressed. */
 const resizeAccents = (length: number, prev: boolean[] = []): boolean[] =>
   Array.from({ length }, (_, i) => prev[i] ?? i === 0);
+
+/** Resize the mute map, preserving prior values; default unmuted. */
+const resizeMutes = (length: number, prev: boolean[] = []): boolean[] =>
+  Array.from({ length }, (_, i) => prev[i] ?? false);
 
 export const usePlayback = create<PlaybackState>((set) => ({
   audioReady: false,
@@ -63,7 +76,9 @@ export const usePlayback = create<PlaybackState>((set) => ({
   bpm: BPM_DEFAULT,
   beatsPerBar: BEATS_DEFAULT,
   accents: resizeAccents(BEATS_DEFAULT),
+  mutes: resizeMutes(BEATS_DEFAULT),
   subdivision: 1,
+  swing: 0,
   currentBeat: -1,
   activePracticeId: null,
 
@@ -77,16 +92,25 @@ export const usePlayback = create<PlaybackState>((set) => ({
       return {
         beatsPerBar,
         accents: resizeAccents(beatsPerBar, s.accents),
+        mutes: resizeMutes(beatsPerBar, s.mutes),
         activePracticeId: null,
       };
     }),
-  toggleAccent: (index) =>
+  cycleBeat: (index) =>
     set((s) => {
+      const stressed = s.accents[index];
+      const muted = s.mutes[index];
+      // normal (F,F) → stressed (T,F) → muted (F,T) → normal
+      const nextStressed = !stressed && !muted;
+      const nextMuted = stressed && !muted;
       const accents = s.accents.slice();
-      accents[index] = !accents[index];
-      return { accents, activePracticeId: null };
+      const mutes = s.mutes.slice();
+      accents[index] = nextStressed;
+      mutes[index] = nextMuted;
+      return { accents, mutes, activePracticeId: null };
     }),
   setSubdivision: (subdivision) => set({ subdivision, activePracticeId: null }),
+  setSwing: (swing) => set({ swing: clampSwing(swing), activePracticeId: null }),
   setCurrentBeat: (currentBeat) => set({ currentBeat }),
   applyPreset: (id, preset) =>
     set(() => {
@@ -96,6 +120,8 @@ export const usePlayback = create<PlaybackState>((set) => ({
         beatsPerBar,
         subdivision: preset.subdivision,
         accents: Array.from({ length: beatsPerBar }, (_, i) => preset.accents[i] ?? false),
+        mutes: Array.from({ length: beatsPerBar }, (_, i) => preset.mutes?.[i] ?? false),
+        swing: clampSwing(preset.swing ?? 0),
         activePracticeId: id,
       };
     }),

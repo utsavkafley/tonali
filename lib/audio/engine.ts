@@ -47,6 +47,11 @@ export function setBpm(bpm: number): void {
   Tone.getTransport().bpm.value = bpm;
 }
 
+/** Live swing change — 0..1, swings the off-beats of `swingSubdivision` (default 8n). */
+export function setSwing(amount: number): void {
+  Tone.getTransport().swing = amount;
+}
+
 /** Start playback from the top of the bar so beat 1 lands first. */
 export function startTransport(): void {
   const t = Tone.getTransport();

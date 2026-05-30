@@ -17,6 +17,8 @@ export function MeterControls() {
   const setBeatsPerBar = usePlayback((s) => s.setBeatsPerBar);
   const subdivision = usePlayback((s) => s.subdivision);
   const setSubdivision = usePlayback((s) => s.setSubdivision);
+  const swing = usePlayback((s) => s.swing);
+  const setSwing = usePlayback((s) => s.setSwing);
 
   return (
     <div className="flex flex-col items-center gap-5">
@@ -64,6 +66,25 @@ export function MeterControls() {
             </button>
           );
         })}
+      </div>
+
+      {/* Swing — shifts the off-beats later for a shuffle feel */}
+      <div className="flex w-72 flex-col items-center gap-1.5">
+        <div className="flex w-full items-center justify-between">
+          <span className="text-xs uppercase tracking-wider text-foreground/50">Swing</span>
+          <span className="font-mono text-xs tabular-nums text-foreground/50">
+            {Math.round(swing * 100)}%
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(swing * 100)}
+          onChange={(e) => setSwing(Number(e.target.value) / 100)}
+          aria-label="Swing amount"
+          className="h-1 w-full cursor-pointer appearance-none rounded-full bg-foreground/15 accent-[#ff5a3c]"
+        />
       </div>
     </div>
   );
