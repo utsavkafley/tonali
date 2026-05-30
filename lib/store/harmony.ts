@@ -19,9 +19,15 @@ interface HarmonyState {
   toFret: number;
   showDegrees: boolean; // true = degree labels (default), false = note names (later)
 
+  /** Current chord (Slice 1): null = none, just the scale. Later driven by a progression. */
+  chordRoot: string | null;
+  chordType: string; // Tonal suffix: "", "m", "7", "m7", …
+
   setRoot: (root: string) => void;
   setScale: (scale: ScaleId) => void;
   setFretWindow: (fromFret: number, toFret: number) => void;
+  setChordRoot: (root: string | null) => void;
+  setChordType: (type: string) => void;
 }
 
 const clampFret = (n: number) => Math.min(FRET_MAX, Math.max(0, Math.round(n)));
@@ -34,6 +40,8 @@ export const useHarmony = create<HarmonyState>((set) => ({
   fromFret: 0,
   toFret: 12,
   showDegrees: true,
+  chordRoot: null,
+  chordType: "",
 
   setRoot: (root) => set({ root }),
   setScale: (scale) => set({ scale }),
@@ -44,4 +52,6 @@ export const useHarmony = create<HarmonyState>((set) => ({
       if (fromFret > toFret) [fromFret, toFret] = [toFret, fromFret];
       return { fromFret, toFret };
     }),
+  setChordRoot: (chordRoot) => set({ chordRoot }),
+  setChordType: (chordType) => set({ chordType }),
 }));

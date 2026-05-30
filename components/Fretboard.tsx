@@ -8,7 +8,7 @@
  */
 import { useMemo, useState } from "react";
 import { useHarmony } from "@/lib/store/harmony";
-import { scaleChromaMap } from "@/lib/theory/scales";
+import { buildFretboardContext, type NoteRole } from "@/lib/theory/scales";
 import {
   fretboardMarkers,
   SINGLE_INLAYS,
@@ -16,6 +16,32 @@ import {
 } from "@/lib/theory/fretboard";
 
 const ACCENT = "#ff5a3c";
+
+/** Visual tier per role: accent (roots) > solid (chord tones) > outlined (passing). */
+function markerStyle(role: NoteRole) {
+  switch (role) {
+    case "root":
+    case "chordRoot":
+      return { fill: ACCENT, stroke: ACCENT, strokeOpacity: 1, text: "#fff", weight: 700 };
+    case "chordTone":
+      return {
+        fill: "currentColor",
+        stroke: "currentColor",
+        strokeOpacity: 1,
+        text: "var(--background)",
+        weight: 700,
+      };
+    default: // scaleTone (passing)
+      return {
+        fill: "var(--background)",
+        stroke: "currentColor",
+        strokeOpacity: 0.5,
+        text: "currentColor",
+        weight: 500,
+      };
+  }
+}
+
 const CELL_W = 54;
 const STRING_GAP = 32;
 const PAD_X = 28;
@@ -24,13 +50,17 @@ const NUM_H = 30;
 const R = 13;
 
 export function Fretboard() {
-  const { root, scale, tuning, handedness, fromFret, toFret, showDegrees } = useHarmony();
+  const { root, scale, tuning, handedness, fromFret, toFret, showDegrees, chordRoot, chordType } =
+    useHarmony();
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const scaleMap = useMemo(() => scaleChromaMap(root, scale), [root, scale]);
+  const context = useMemo(
+    () => buildFretboardContext(root, scale, chordRoot ? { root: chordRoot, type: chordType } : null),
+    [root, scale, chordRoot, chordType],
+  );
   const markers = useMemo(
-    () => fretboardMarkers(tuning, fromFret, toFret, scaleMap),
-    [tuning, fromFret, toFret, scaleMap],
+    () => fretboardMarkers(tuning, fromFret, toFret, context),
+    [tuning, fromFret, toFret, context],
   );
 
   const frets = [];
@@ -123,11 +153,12 @@ export function Fretboard() {
         </text>
       ))}
 
-      {/* Note markers — label shows the degree; hovering flips it to the note name. */}
+      {/* Note markers — label shows the degree; hovering flips it to the note name.
+          Roots & chord roots = accent fill; chord tones = solid fill; passing = outlined. */}
       {markers.map(({ string, fret, note }) => {
         const x = xCenter(fret);
         const y = yString(string);
-        const isRoot = note.role === "root";
+        const s = markerStyle(note.role);
         const key = `${string}-${fret}`;
         const primary = showDegrees ? note.degree : note.name;
         const alternate = showDegrees ? note.name : note.degree;
@@ -143,9 +174,9 @@ export function Fretboard() {
               cx={x}
               cy={y}
               r={R}
-              fill={isRoot ? ACCENT : "var(--background)"}
-              stroke={isRoot ? ACCENT : "currentColor"}
-              strokeOpacity={isRoot ? 1 : 0.55}
+              fill={s.fill}
+              stroke={s.stroke}
+              strokeOpacity={s.strokeOpacity}
               strokeWidth={1.5}
             />
             <text
@@ -154,8 +185,8 @@ export function Fretboard() {
               textAnchor="middle"
               dominantBaseline="central"
               fontSize={11}
-              fontWeight={isRoot ? 700 : 500}
-              fill={isRoot ? "#fff" : "currentColor"}
+              fontWeight={s.weight}
+              fill={s.text}
               fontFamily="monospace"
             >
               {label}

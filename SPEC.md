@@ -122,6 +122,16 @@ shows its theory. `activePracticeId` highlights it; any manual edit de-highlight
 practices shown as teasers. A "Learn" section holds reference theory.
 → `lib/practice/{types,rhythm,index}.ts`, `store/playback.ts`, `PracticePanel.tsx`
 
+**Step 8 — Chord-tone highlighting (Chords pillar, slice 1).** A **chord picker** (root +
+quality) on the Fretboard. With a chord active the board shows three tiers: **chord root**
+(accent), **chord tones** (solid fill), **passing/scale tones** (outlined) — the signature
+North-Star visual. Song-mode (Next Pillar §E): chord tones that fall outside the scale are
+still shown (they always work over the chord); degrees are computed relative to the key so
+even out-of-scale tones label correctly. New theory: `buildFretboardContext` + chord helpers;
+`fretboardMarkers` generalized to `DisplayNote`/roles. Hover still flips degree↔note name.
+→ `lib/theory/scales.ts`, `lib/theory/fretboard.ts`, `lib/store/harmony.ts`, `Fretboard.tsx`,
+`FretboardControls.tsx`
+
 **Step 7 — Layered Practice Surface.** Unified the app onto one surface: the Metronome,
 Fretboard, and a Texture placeholder are **swipeable full views** (swipe up/down, arrow
 keys, chevrons, or layer dots), not tabs/routes. Audio lifecycle moved out of the metronome
@@ -148,6 +158,43 @@ moving the tick source, the scheduler now tracks grid position with a **step cou
 (swing-immune) instead of inverting `time`→ticks. Tempo & swing reach the engine via one
 store→engine subscription (in `Metronome`), covering manual edits, tap tempo and presets.
 → `store/playback.ts`, `engine.ts`, `metronome.ts`, `BeatRow.tsx`, `MeterControls.tsx`, `rhythm.ts`
+
+---
+
+## Big Idea — "The Wind" (lick guide) [concept, decided, not scheduled]
+
+A living, ambient guide inspired by Ghost of Tsushima's wind: it suggests a small, beautiful
+phrase to play right now — drawn as a **swipe-typing-style squiggle** across strings/frets —
+turning "I only know the scale shape" into "here's something cool to play." **Inspiration
+over instruction.** The signature delighter; layered on top of the Chords pillar.
+
+**Decided design (from the user):**
+- **Purpose / audience.** For players who know the scale shape but not *what to play*. Pure
+  guidance, so it's **toggleable** (experienced players turn it off). On by default.
+- **Form = a swipe-typing path.** One continuous squiggle through the notes (across strings,
+  over multiple frets) showing order *and motion*, like gesture typing. The shape of the path
+  encodes **articulation**:
+  - parabolic arc → **bend**
+  - tremor/wiggle on a note → **vibrato**
+  - diagonal sweep fret→fret → **slide**
+  - pulse/bump between adjacent notes → **hammer-on / pull-off**
+- **Source = curated, transpose-invariant lick templates per scale type** (blues/minor-pent
+  first, then major-pent — the lick-richest, most popular). Encode each lick as **relative
+  scale-degree + string/fret-offset + articulation** (a *shape*, not raw pitches), so it
+  transposes to all 12 keys for free and drops into the user's current fret window. Curated
+  from the wealth of known classic licks (curated-first; AI generation is a later maybe).
+  It's mathematical: make the renderer + data model work for one scale/key → all others are
+  just data.
+- **Trigger.** Shows by default when a **progression is started** in the fretboard view;
+  toggleable (on by default).
+
+**Implied data model (sketch):** `Lick = { scaleType, notes: [{ degree, string, fretOffset,
+articulation }], anchorDegree }`; render = transpose to key + place in window + draw the
+articulated path. *Future:* animate the squiggle in time with the transport (and optionally
+audition it).
+
+Not now — do not get distracted. Captured so we don't lose it; revisit once the Chords pillar
+has chord context + progression playback to hang it on.
 
 ---
 
@@ -237,6 +284,13 @@ fretboard/chords and show key/scale/chord-tone theory.
 
 ## Changelog
 
+- **v18** — Sharpened "The Wind" lick-guide idea with the user's decisions: toggleable
+  guidance (on by default), swipe-typing squiggle whose shape encodes articulation
+  (bend/vibrato/slide/hammer), curated transpose-invariant lick templates per scale type
+  (blues/pentatonic first), triggered when a progression starts. Added a data-model sketch.
+- **v17** — Built Step 8 (Chords pillar slice 1): chord picker + chord-tone highlighting on
+  the fretboard (chord root / chord tone / passing tiers), song-mode incl. out-of-scale chord
+  tones. Captured the "Wind" lick-guide big idea (concept, parked).
 - **v16** — Built Step 7: unified Layered Practice Surface. Swipeable full views (no docks
   — dropped as clutter), audio decoupled from focus (layers stay ON), `session` focus store,
   context-sensitive Practice drawer, Scales theory added, nav/route removed.

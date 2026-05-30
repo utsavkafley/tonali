@@ -4,7 +4,7 @@
  * SVG — the component draws; this decides what's there.
  */
 import { Note } from "tonal";
-import type { ScaleNote } from "./scales";
+import type { DisplayNote } from "./scales";
 
 /** Standard tuning, low → high string. */
 export const STANDARD_TUNING = ["E2", "A2", "D3", "G3", "B3", "E4"];
@@ -18,22 +18,22 @@ export const DOUBLE_INLAYS = [12, 24];
 export type FretMarker = {
   string: number; // 0 = low E (tuning index)
   fret: number;
-  note: ScaleNote;
+  note: DisplayNote;
 };
 
-/** Active notes within [fromFret, toFret] for the given tuning + scale chroma map. */
+/** Active notes within [fromFret, toFret] for the given tuning + context chroma map. */
 export function fretboardMarkers(
   tuning: string[],
   fromFret: number,
   toFret: number,
-  scaleMap: Map<number, ScaleNote>,
+  context: Map<number, DisplayNote>,
 ): FretMarker[] {
   const markers: FretMarker[] = [];
   tuning.forEach((open, string) => {
     const openChroma = Note.chroma(open) ?? 0;
     for (let fret = fromFret; fret <= toFret; fret++) {
       const chroma = (openChroma + fret) % 12;
-      const note = scaleMap.get(chroma);
+      const note = context.get(chroma);
       if (note) markers.push({ string, fret, note });
     }
   });

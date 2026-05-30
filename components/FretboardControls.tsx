@@ -6,22 +6,33 @@
  * less-robotic improv, rather than staring at a fixed 0–22 board.
  */
 import { useHarmony, FRET_MAX } from "@/lib/store/harmony";
-import { ROOTS, SCALES, type ScaleId } from "@/lib/theory/scales";
+import { ROOTS, SCALES, CHORD_TYPES, type ScaleId } from "@/lib/theory/scales";
+
+const SELECT_CLASS =
+  "rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm " +
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40";
 
 export function FretboardControls() {
-  const { root, scale, fromFret, toFret, setRoot, setScale, setFretWindow } = useHarmony();
+  const {
+    root,
+    scale,
+    fromFret,
+    toFret,
+    chordRoot,
+    chordType,
+    setRoot,
+    setScale,
+    setFretWindow,
+    setChordRoot,
+    setChordType,
+  } = useHarmony();
 
   return (
     <div className="flex flex-col items-center gap-5">
       {/* Key + scale */}
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Field label="Key">
-          <select
-            value={root}
-            onChange={(e) => setRoot(e.target.value)}
-            className="rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm
-                       focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40"
-          >
+          <select value={root} onChange={(e) => setRoot(e.target.value)} className={SELECT_CLASS}>
             {ROOTS.map((r) => (
               <option key={r} value={r}>
                 {r}
@@ -34,8 +45,7 @@ export function FretboardControls() {
           <select
             value={scale}
             onChange={(e) => setScale(e.target.value as ScaleId)}
-            className="rounded-md border border-foreground/15 bg-background px-3 py-2 text-sm
-                       focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40"
+            className={SELECT_CLASS}
           >
             {SCALES.map((s) => (
               <option key={s.id} value={s.id}>
@@ -44,6 +54,38 @@ export function FretboardControls() {
             ))}
           </select>
         </Field>
+      </div>
+
+      {/* Chord — highlights chord tones over the scale (Slice 1) */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Field label="Chord">
+          <select
+            value={chordRoot ?? "none"}
+            onChange={(e) => setChordRoot(e.target.value === "none" ? null : e.target.value)}
+            className={SELECT_CLASS}
+          >
+            <option value="none">None</option>
+            {ROOTS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <select
+          value={chordType}
+          onChange={(e) => setChordType(e.target.value)}
+          disabled={chordRoot === null}
+          aria-label="Chord quality"
+          className={`${SELECT_CLASS} disabled:cursor-not-allowed disabled:opacity-40`}
+        >
+          {CHORD_TYPES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Fret window */}
