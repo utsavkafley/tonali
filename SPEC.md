@@ -220,7 +220,7 @@ app/page.tsx             // mounts PadGrid in the top-right corner
 
 ---
 
-## Step 3 — Metronome: meter, stress & subdivision (current)
+## Step 3 — Metronome: meter, stress & subdivision ✅ done
 
 Expands the metronome with a control row below it: choose how many beats per bar,
 stress specific beat(s), and subdivide the beat — while seeing which beat is playing.
@@ -267,10 +267,132 @@ components/Metronome.tsx  // wires the new row; reschedules on subdivision chang
 
 ---
 
+## Step 4 — Theory + Practice panel (next)
+
+A **left-side expanding panel** that is the app's **Theory + Practice hub** — both the
+place you launch guided practices *and* the place you go to read up and figure things
+out. Step 4 builds the **Rhythm** domain, but the panel is architected for more.
+
+### The panel is a hub, not a metronome accessory (architecture)
+Top level is **practice domains**, each with its own practices and its own theory:
+
+- **Rhythm** (built now) — practices preset the **metronome** (beats/subdivision/
+  accents/BPM); theory covers subdivision, accents/backbeat, meters/compound feel.
+- **Harmony / Chords**, **Scales** (future domains, shown as "coming soon") — practices
+  will preset the **fretboard + chord engine** (key, scale, progression); theory will
+  show key, scale notes/degrees, chord tones, etc.
+
+So a practice is "apply a domain-specific config + show domain-specific theory." Only
+the Rhythm domain has a live engine today; the structure lets Harmony slot in later
+without reworking the panel. Each domain shows **both** per-practice tips **and** general
+reference content ("read more / figure stuff out"), not just preset buttons.
+
+### Why it exists
+We already built every rhythm mechanic; this surfaces them as named, opinionated
+practices so the user doesn't have to know how to dial in a "backbeat" or "6/8 feel" by
+hand. It teaches while it configures — and becomes the home for all future theory.
+
+### What the user sees and does
+- A collapsed tab on the left edge; click to expand the panel.
+- Practices grouped (Foundations → Subdivisions → Meters & Feels → Pocket). Each row:
+  name + one-line "what it trains."
+- Selecting a practice applies its preset to the metronome (via the store) and shows a
+  short blurb + a tip. The user then hits the big circle to start. (Preset only —
+  it does not auto-start.)
+- An "active practice" highlight; manually changing a control just means you've
+  customized off a preset (no lock-in).
+
+### Proposed practice menu (default BPMs by feel — refine with user)
+Foundations
+- **Steady Quarters** — 4 beats, quarter, accent 1, ~80. Lock to the pulse.
+- **Backbeat (2 & 4)** — 4 beats, quarter, accents 2 & 4, ~90. Feel the groove/snare.
+
+Subdivisions
+- **Eighth Notes** — 4 beats, eighths, accent 1, ~70. Internalize the "and."
+- **Sixteenth Notes** — 4 beats, sixteenths, accent 1, ~60. Even picking/strumming.
+- **Triplets** — 4 beats, triplets, accent 1, ~66. Compound/blues triplet feel.
+
+Meters & Feels
+- **Waltz (3/4)** — 3 beats, quarter, accent 1, ~120. Three-feel.
+- **6/8 Compound** — 2 beats, triplets, accent 1, ~60 (felt dotted-quarter). Lilt.
+- **5/4 Odd (3+2)** — 5 beats, quarter, accents 1 & 4, ~100. Odd-time grouping.
+
+Pocket
+- **Slow Pocket** — 4 beats, eighths, accents 2 & 4, ~55. Sit behind the beat.
+
+Locked until the rhythm-backlog pieces land (shown, disabled, with a note):
+- **Shuffle / Swing** — needs swing.
+- **Gap-Click (drop beats)** — needs muted beats.
+- **Clave / Offbeats** — needs subdivision-level accents.
+
+### Design notes
+- **Data-driven** (`lib/practice/`): a `Domain` has `{ id, name, available, theory[] }`;
+  a `Practice` has `{ id, domain, group, name, trains, blurb, tip, requires?, rhythm? }`
+  where `rhythm` is the domain-specific config (bpm, beatsPerBar, subdivision, accents).
+  Future domains add their own config field (e.g. `harmony?`). Adding a practice = a
+  data row; adding a domain = a data entry + (when it has an engine) an `apply` mapping.
+- Store gains `applyPreset(rhythm)` (sets bpm + beats + accents + subdivision atomically,
+  resizing the accent map) and `activePracticeId`. Manual control changes clear
+  `activePracticeId` (you've customized off a practice).
+- Panel is collapsible; on tablet it overlays rather than squeezing the metronome.
+- Future (Harmony/Scales) domains render as "coming soon" now — consistent with showing
+  locked practice teasers.
+
+### Files this step touches
+```
+lib/practice/types.ts     // Domain, Practice, RhythmPreset types
+lib/practice/rhythm.ts    // the Rhythm domain: practices + theory reference
+lib/practice/index.ts     // domains[] registry (Rhythm + coming-soon stubs)
+lib/store/playback.ts     // applyPreset(), activePracticeId
+components/PracticePanel.tsx // the left expanding hub (domains, practices, theory)
+app/page.tsx              // mounts the panel on the left
+```
+
+### Done when
+- Selecting a practice instantly configures the metronome to match and shows its blurb.
+- Hitting start plays exactly that feel; tweaking a control de-highlights the practice.
+- Locked practices and future domains are visible but clearly unavailable.
+- Panel reads as a theory hub (reference content present), not just preset buttons.
+
+---
+
+## Time Signature Model (standing note)
+
+How time signatures map onto our controls, so we don't over-build later.
+
+- **Top number = our "Beats" stepper** — the count of units per bar.
+- **Bottom number = the note value of one unit** (4 = quarter, 8 = eighth, …). We do
+  **not** expose this; the app is effectively always "x/4". This is deliberate: the
+  denominator is a *notation/naming* convention, **not an audible property** — N evenly
+  spaced clicks per bar at a given BPM sound identical whether the unit is called a
+  quarter or an eighth. What's actually audible (pulse count, accent grouping, internal
+  subdivision) we already control.
+- **Simple vs compound feel:** in simple meters the top number = felt beats. In
+  compound meters (6/8, 9/8, 12/8) the units group in threes and you *feel* the groups.
+  We reproduce compound feel with the tools we have, e.g. **6/8 = Beats 2 + triplet
+  subdivision + stress beat 1** (two dotted-quarter beats, each split into three).
+- **If we ever add a denominator picker**, it'd be for *display/labeling* (show "6/8")
+  and *accent-grouping presets*, not for new audio behavior. Logged for the
+  time-signature backlog item below.
+
+---
+
 ## Backlog (the destination — not scheduled, not designed in detail yet)
 
 Kept here so we don't lose the vision. We pull from this one item at a time.
 
+### Rhythm-trainer pieces (flagged as the high-leverage missing mechanics)
+- **Muted / silent beats** — a 4th accent level (cycle normal → stressed → muted).
+  Unlocks the highest-value drill: clicks drop out and *you* keep time (gap-click,
+  "click on 1 only"). Turns the metronome from keeping time *for* you into testing
+  *your* time. The accent map already generalizes to it.
+- **Subdivision-level accents** — accent the "and"/offbeats, not just whole beats.
+  Unlocks clave/son patterns, reggae/ska upbeat training. Needs the click grid to
+  carry an accent map at the subdivision resolution, not just per beat.
+- **Swing / shuffle** — the deferred groove feel; `Transport.swing` is already wired,
+  needs a UI amount + a shuffle subdivision. Unlocks the Shuffle/Swing practice.
+
+### Other backlog
 - Swing/groove slider (engine already supports it)
 - Drum engine with real samples + genre-aware patterns (shuffle, rock, funk, jazz,
   bossa). Bundles the pad "Tap BPM" mode toggle (auto-revert) so drumming the pads
@@ -287,12 +409,28 @@ Kept here so we don't lose the vision. We pull from this one item at a time.
 - LLM chord-sheet parser → structured song
 - Song view (chords over lyrics), section looping, Supabase library
 - Alternate tunings, capo, fretboard position selector
-- Other time signatures (3/4, 6/8)
+- Other time signatures (3/4, 6/8) — denominator picker is display/preset only; see
+  Time Signature Model standing note. Could ship accent-grouping presets (backbeat,
+  6/8, clave-ish) for common feels.
 
 ---
 
 ## Living-Document Changelog
 
+- **v9** — Built Step 4. Reframed the panel as a **Theory + Practice hub** (domains at
+  top level), not a metronome accessory: Rhythm is live (presets metronome + theory),
+  Harmony/Scales are coming-soon stubs that will drive the fretboard/chords later. Data
+  layer in `lib/practice/` (types, rhythm domain, registry); store gained `applyPreset`
+  + `activePracticeId` (manual edits de-highlight). Left expanding drawer with grouped
+  practices, per-practice blurb+tip, locked teasers, and a "Learn" theory section.
+- **v8** — Marked Step 3 done. Defined Step 4 (Theory + Practice panel): a left
+  expanding panel of guided practices that preset the metronome (beats/subdivision/
+  accents/BPM) and teach the "why." Proposed an early-intermediate practice menu.
+  Added the rhythm-trainer backlog pieces (muted beats, subdivision-level accents,
+  swing) and flagged which practices they unlock.
+- **v7** — Added the Time Signature Model standing note: top number = Beats stepper,
+  denominator is display-only (not audible), compound feel achieved via beats +
+  subdivision + stress. Noted denominator picker as display/preset-only future work.
 - **v6** — Defined + built Step 3 (metronome expansion): interactive beat row
   (indicator + per-beat stress), beats-per-bar stepper, and subdivision selector
   (quarter/eighth/triplet/sixteenth). Click voice gained a 3rd "subdivision" level.
