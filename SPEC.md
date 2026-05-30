@@ -39,22 +39,19 @@ move to the next. No context switching, ever.
 3. **Texture — Instrumentation.** Bass (synth), keys (grand piano), pads — makes it lively.
 
 **Interaction rules:**
-- **Focus + dock.** The layer you're shaping is center stage. Settled layers **minimize to
-  a corner and KEEP RUNNING** (the metronome docks to the **top-left**, click still going).
-- **Swipe up promotes** to the next layer (docking the current); **swipe down returns**.
-  On desktop, an equivalent on-screen affordance + keyboard does the same.
-- **Tap a docked layer to re-focus it.** Nothing is ever closed — only foregrounded or
-  backgrounded.
+- **Full views swipe in and out.** One layer is on screen at a time; the others aren't
+  shown but **KEEP RUNNING** — audio is decoupled from focus, so the metronome clicks on
+  while you're on the fretboard. (No corner docks — they'd be clutter for no benefit.)
+- **Move focus** by swipe up/down, arrow keys, the chevrons, or the layer dots. Up moves
+  toward the top of the stack; order is otherwise free (jump to any layer anytime).
 - **The looper bridges layer 1 → 2:** once the progression's timing feels good, loop it as a
-  hands-free backing, then improvise over it. This is what turns the foundation into a
-  backing track.
-- **The Practice/Theory drawer stays** as the cross-layer place to load presets (which can
-  configure any layer) and read theory.
+  hands-free backing, then improvise over it. Turns the foundation into a backing track.
+- **The Practice/Theory drawer is context-sensitive:** it shows the focused layer's domain
+  (Rhythm on the metronome, Scales on the fretboard, …) for presets + theory.
 
-**Consequence:** no routes/tabs. The temporary Metronome/Fretboard nav (Step 6) is
-transitional — the fretboard folds into the surface as the Harmony layer. State is already
-layer-friendly (`playback` = timing, `harmony` = pitch compose); we add a focus/dock state
-on top.
+**State:** `playback` = timing, `harmony` = pitch, `session` = which layer is focused. Audio
+lifecycle lives in the always-mounted surface, not in any view, so layers never stop when
+you swipe away.
 
 ---
 
@@ -124,6 +121,16 @@ tip; selecting one calls `applyPreset` (sets bpm/beats/subdivision/accents atomi
 shows its theory. `activePracticeId` highlights it; any manual edit de-highlights. Locked
 practices shown as teasers. A "Learn" section holds reference theory.
 → `lib/practice/{types,rhythm,index}.ts`, `store/playback.ts`, `PracticePanel.tsx`
+
+**Step 7 — Layered Practice Surface.** Unified the app onto one surface: the Metronome,
+Fretboard, and a Texture placeholder are **swipeable full views** (swipe up/down, arrow
+keys, chevrons, or layer dots), not tabs/routes. Audio lifecycle moved out of the metronome
+view into the always-mounted surface (+ `metronomeController.ts`), so layers **keep running**
+when not shown. New `session` store tracks focus. The Practice drawer is now
+**context-sensitive** (follows the focused layer's domain); the Scales domain gained live
+theory. Removed the temporary nav + `/fretboard` route.
+→ `lib/store/session.ts`, `lib/audio/metronomeController.ts`, `PracticeSurface.tsx`,
+`Metronome.tsx`, `PracticePanel.tsx`, `lib/practice/index.ts`, `app/page.tsx`, `app/layout.tsx`
 
 **Step 6 — Fretboard (theory pillar, first slice).** A `/fretboard` route renders a
 static board for a chosen **key + scale** with **degree labels** (R / ♭3 / 5 / ♭7) over a
@@ -230,6 +237,9 @@ fretboard/chords and show key/scale/chord-tone theory.
 
 ## Changelog
 
+- **v16** — Built Step 7: unified Layered Practice Surface. Swipeable full views (no docks
+  — dropped as clutter), audio decoupled from focus (layers stay ON), `session` focus store,
+  context-sensitive Practice drawer, Scales theory added, nav/route removed.
 - **v15** — Locked the **Layered Practice Surface** interaction model: one surface, no
   tabs; stack timing → harmony → texture; focus + dock (settled layers minimize and keep
   running); swipe-up promotes; looper bridges timing → harmony. The Step-6 nav is

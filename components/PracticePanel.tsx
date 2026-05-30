@@ -7,17 +7,23 @@
  */
 import { useState } from "react";
 import { domains } from "@/lib/practice";
-import {
-  REQUIREMENT_LABEL,
-  type DomainId,
-  type Practice,
-} from "@/lib/practice/types";
+import { REQUIREMENT_LABEL, type DomainId, type Practice } from "@/lib/practice/types";
 import { usePlayback } from "@/lib/store/playback";
+import { useSession, type LayerId } from "@/lib/store/session";
+
+/** The drawer follows the focused layer: it shows that layer's domain. */
+const DOMAIN_FOR_LAYER: Record<LayerId, DomainId> = {
+  timing: "rhythm",
+  harmony: "scales",
+  texture: "harmony",
+};
 
 export function PracticePanel() {
   const [open, setOpen] = useState(false);
-  const [domainId, setDomainId] = useState<DomainId>("rhythm");
   const [openId, setOpenId] = useState<string | null>(null);
+
+  const focus = useSession((s) => s.focus);
+  const domainId = DOMAIN_FOR_LAYER[focus];
 
   const activeId = usePlayback((s) => s.activePracticeId);
   const applyPreset = usePlayback((s) => s.applyPreset);
@@ -62,11 +68,9 @@ export function PracticePanel() {
       >
         <header className="flex items-center justify-between border-b border-foreground/10 px-5 py-4">
           <div>
-            <h2 className="text-[1.2rem] font-semibold tracking-tight">
-              Theory &amp; Practice
-            </h2>
+            <h2 className="text-[1.2rem] font-semibold tracking-tight">{domain.name}</h2>
             <p className="text-[1.1rem] text-foreground/50">
-              Guided drills, preset for you.
+              Practice &amp; theory for the layer you&apos;re on.
             </p>
           </div>
           <button
@@ -78,29 +82,6 @@ export function PracticePanel() {
             ✕
           </button>
         </header>
-
-        {/* Domain tabs */}
-        <nav className="flex gap-1 border-b border-foreground/10 px-3 py-2">
-          {domains.map((d) => (
-            <button
-              key={d.id}
-              onClick={() => {
-                setDomainId(d.id);
-                setOpenId(null);
-              }}
-              className={`rounded-md px-2.5 py-1.5 text-[1rem] font-medium transition-colors ${
-                d.id === domainId
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-foreground/50 hover:bg-foreground/[0.04] hover:text-foreground/80"
-              }`}
-            >
-              {d.name}
-              {!d.available && (
-                <span className="ml-1 text-base text-foreground/40">soon</span>
-              )}
-            </button>
-          ))}
-        </nav>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <p className="mb-4 text-[1rem] leading-relaxed text-foreground/60">

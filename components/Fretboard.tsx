@@ -6,7 +6,7 @@
  * markers where the current key+scale lands. Right-handed by default (nut left); a left
  * handedness flips the fret order.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useHarmony } from "@/lib/store/harmony";
 import { scaleChromaMap } from "@/lib/theory/scales";
 import {
@@ -25,6 +25,7 @@ const R = 13;
 
 export function Fretboard() {
   const { root, scale, tuning, handedness, fromFret, toFret, showDegrees } = useHarmony();
+  const [hovered, setHovered] = useState<string | null>(null);
 
   const scaleMap = useMemo(() => scaleChromaMap(root, scale), [root, scale]);
   const markers = useMemo(
@@ -122,13 +123,22 @@ export function Fretboard() {
         </text>
       ))}
 
-      {/* Note markers */}
+      {/* Note markers — label shows the degree; hovering flips it to the note name. */}
       {markers.map(({ string, fret, note }) => {
         const x = xCenter(fret);
         const y = yString(string);
         const isRoot = note.role === "root";
+        const key = `${string}-${fret}`;
+        const primary = showDegrees ? note.degree : note.name;
+        const alternate = showDegrees ? note.name : note.degree;
+        const label = hovered === key ? alternate : primary;
         return (
-          <g key={`m-${string}-${fret}`}>
+          <g
+            key={`m-${key}`}
+            className="cursor-pointer"
+            onMouseEnter={() => setHovered(key)}
+            onMouseLeave={() => setHovered((h) => (h === key ? null : h))}
+          >
             <circle
               cx={x}
               cy={y}
@@ -148,7 +158,7 @@ export function Fretboard() {
               fill={isRoot ? "#fff" : "currentColor"}
               fontFamily="monospace"
             >
-              {showDegrees ? note.degree : note.name}
+              {label}
             </text>
           </g>
         );
