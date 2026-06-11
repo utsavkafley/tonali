@@ -5,14 +5,18 @@
  * barlines, repeat-sign brackets, ×N labels, and a rep counter while playing.
  * Clicking a chord calls selectChord which drives both the fretboard and playback.
  */
+import { useState } from "react";
 import { useHarmony } from "@/lib/store/harmony";
 import { chordLabel } from "@/lib/theory/scales";
+import { ChordDiagram } from "./ChordDiagram";
 
 export function ChordChart() {
   const chartData = useHarmony((s) => s.chartData);
   const playSteps = useHarmony((s) => s.playSteps);
   const currentPlayIndex = useHarmony((s) => s.currentPlayIndex);
   const selectChord = useHarmony((s) => s.selectChord);
+  // Which chord cell is showing its shape popover (hover or keyboard focus).
+  const [previewKey, setPreviewKey] = useState<string | null>(null);
 
   if (!chartData || chartData.systems.length === 0) return null;
 
@@ -41,20 +45,44 @@ export function ChordChart() {
                           current?.sectionIdx === secIdx &&
                           current?.barInSection === bIdx &&
                           current?.chordInBar === cIdx;
+                        const cellKey = `${sIdx}-${secIdx}-${bIdx}-${cIdx}`;
+                        const showPreview = previewKey === cellKey;
                         return (
-                          <button
-                            key={cIdx}
-                            onClick={() => selectChord(sIdx, secIdx, bIdx, cIdx)}
-                            aria-pressed={isSelected}
-                            className={`min-w-0 flex-1 rounded px-1 py-3 text-center text-lg
-                              font-semibold tracking-tight transition-colors ${
-                                isSelected
-                                  ? "bg-[#ff5a3c]/15 text-foreground"
-                                  : "text-foreground/80 hover:bg-foreground/[0.05]"
-                              }`}
-                          >
-                            {chordLabel(chord)}
-                          </button>
+                          <div key={cIdx} className="relative min-w-0 flex-1">
+                            <button
+                              onClick={() => selectChord(sIdx, secIdx, bIdx, cIdx)}
+                              onMouseEnter={() => setPreviewKey(cellKey)}
+                              onMouseLeave={() =>
+                                setPreviewKey((k) => (k === cellKey ? null : k))
+                              }
+                              onFocus={() => setPreviewKey(cellKey)}
+                              onBlur={() =>
+                                setPreviewKey((k) => (k === cellKey ? null : k))
+                              }
+                              aria-pressed={isSelected}
+                              className={`w-full rounded px-1 py-3 text-center text-lg
+                                font-semibold tracking-tight transition-colors ${
+                                  isSelected
+                                    ? "bg-[#ff5a3c]/15 text-foreground"
+                                    : "text-foreground/80 hover:bg-foreground/[0.05]"
+                                }`}
+                            >
+                              {chordLabel(chord)}
+                            </button>
+                            {showPreview && (
+                              <div
+                                className="absolute bottom-full left-1/2 z-20 mb-1.5 flex
+                                  -translate-x-1/2 flex-col items-center gap-1 rounded-lg
+                                  border border-foreground/10 bg-background px-3 py-2
+                                  shadow-lg"
+                              >
+                                <span className="font-mono text-xs text-foreground/60">
+                                  {chordLabel(chord)}
+                                </span>
+                                <ChordDiagram chord={chord} />
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>

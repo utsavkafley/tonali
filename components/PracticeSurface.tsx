@@ -18,12 +18,20 @@ import {
 } from "@/lib/audio/engine";
 import { disposeMetronome } from "@/lib/audio/metronome";
 import { stopProgressionClock } from "@/lib/audio/progressionClock";
+import {
+  initDrumEngine,
+  startDrumSequence,
+  stopDrumSequence,
+  setDrumVolume,
+  disposeDrumEngine,
+} from "@/lib/audio/drums";
 import { usePlayback } from "@/lib/store/playback";
+import { useDrums } from "@/lib/store/drums";
 import { useSession, LAYERS, LAYER_META, type LayerId } from "@/lib/store/session";
 import { Metronome } from "@/components/Metronome";
 import { Fretboard } from "@/components/Fretboard";
 import { FretboardControls } from "@/components/FretboardControls";
-import { ChordChart } from "@/components/ChordChart";
+import { ProgressionPanel } from "@/components/ProgressionPanel";
 
 export function PracticeSurface() {
   const focus = useSession((s) => s.focus);
@@ -31,15 +39,56 @@ export function PracticeSurface() {
 
   // Audio lifecycle — mounted once, independent of focus (layers stay ON).
   useEffect(() => {
-    const unsub = usePlayback.subscribe((s, prev) => {
+    const unsubPlayback = usePlayback.subscribe((s, prev) => {
       if (s.bpm !== prev.bpm) setEngineBpm(s.bpm);
       if (s.swing !== prev.swing) setEngineSwing(s.swing);
     });
+
+    // Drum engine: init (after audio context exists) and react to enable/pattern changes.
+    let drumReady = false;
+    const unsubDrums = useDrums.subscribe(async (s, prev) => {
+      if (!usePlayback.getState().audioReady) return;
+
+      if (!drumReady) {
+        await initDrumEngine();
+        setDrumVolume(s.enabled ? s.volumeDb : -Infinity);
+        if (s.enabled) startDrumSequence();
+        drumReady = true;
+        return;
+      }
+
+      if (s.enabled !== prev.enabled || s.pattern.id !== prev.pattern.id) {
+        if (s.enabled) {
+          setDrumVolume(s.volumeDb);
+          startDrumSequence();
+        } else {
+          stopDrumSequence();
+          setDrumVolume(-Infinity);
+        }
+      }
+      if (s.volumeDb !== prev.volumeDb && s.enabled) setDrumVolume(s.volumeDb);
+    });
+
+    // Also init drums as soon as audio is unlocked
+    const unsubAudio = usePlayback.subscribe(async (s, prev) => {
+      if (s.audioReady && !prev.audioReady) {
+        await initDrumEngine();
+        drumReady = true;
+        const ds = useDrums.getState();
+        setDrumVolume(ds.enabled ? ds.volumeDb : -Infinity);
+        if (ds.enabled) startDrumSequence();
+      }
+    });
+
     return () => {
-      unsub();
+      unsubPlayback();
+      unsubDrums();
+      unsubAudio();
       stopProgressionClock();
+      stopDrumSequence();
       stopTransport();
       disposeMetronome();
+      disposeDrumEngine();
     };
   }, []);
 
@@ -71,7 +120,7 @@ function FocusedLayer({ focus }: { focus: LayerId }) {
     return (
       <div className="flex w-full flex-col items-center gap-8">
         <FretboardControls />
-        <ChordChart />
+        <ProgressionPanel />
         <Fretboard />
       </div>
     );

@@ -10,14 +10,21 @@ import {
   type ChartData,
   type PlayStep,
   type ProgressionPreset,
+  PROGRESSIONS,
   parseChartText,
   chartDataToText,
   transposeChart,
   buildChartFromPreset,
+  detectKeyScale,
 } from "@/lib/theory/progressions";
 import { Interval, Note } from "tonal";
 
 export { FRET_MAX };
+
+// A progression is loaded by default so the app opens straight onto the chord chart.
+const DEFAULT_ROOT = "A";
+const DEFAULT_PRESET = PROGRESSIONS[0]; // I–V–vi–IV (Pop)
+const DEFAULT_PROGRESSION = buildChartFromPreset(DEFAULT_ROOT, DEFAULT_PRESET);
 
 interface HarmonyState {
   root: string;
@@ -56,8 +63,8 @@ interface HarmonyState {
 const clampFret = (n: number) => Math.min(FRET_MAX, Math.max(0, Math.round(n)));
 
 export const useHarmony = create<HarmonyState>((set, get) => ({
-  root: "A",
-  scale: "minor_pentatonic",
+  root: DEFAULT_ROOT,
+  scale: DEFAULT_PRESET.suggestedScale,
   tuning: STANDARD_TUNING,
   handedness: "right",
   fromFret: 0,
@@ -65,9 +72,9 @@ export const useHarmony = create<HarmonyState>((set, get) => ({
   showDegrees: true,
   chordRoot: null,
   chordType: "",
-  chartData: null,
-  playSteps: [],
-  progressionId: null,
+  chartData: DEFAULT_PROGRESSION.chartData,
+  playSteps: DEFAULT_PROGRESSION.playSteps,
+  progressionId: DEFAULT_PRESET.id,
   currentPlayIndex: 0,
   progressionPlaying: false,
 
@@ -102,12 +109,24 @@ export const useHarmony = create<HarmonyState>((set, get) => ({
   setProgressionText: (text) => {
     const { chartData, playSteps } = parseChartText(text);
     const hasContent = chartData.systems.length > 0;
-    set((s) => ({
-      chartData: hasContent ? chartData : null,
-      playSteps: hasContent ? playSteps : [],
-      progressionId: hasContent ? "custom" : null,
-      currentPlayIndex: Math.min(s.currentPlayIndex, Math.max(0, playSteps.length - 1)),
-    }));
+    set((s) => {
+      if (!hasContent) {
+        return { chartData: null, playSteps: [], progressionId: null, currentPlayIndex: 0 };
+      }
+      // Detect & apply key + scale only when the chord content actually changed (so a
+      // no-op blur, or a manual scale override, isn't clobbered). Key is set DIRECTLY —
+      // not via setRoot — because the typed chords are already in that key (no transpose).
+      const prevText = s.chartData ? chartDataToText(s.chartData) : "";
+      const changed = chartDataToText(chartData) !== prevText;
+      const detected = changed ? detectKeyScale(chartData) : null;
+      return {
+        chartData,
+        playSteps,
+        progressionId: "custom",
+        currentPlayIndex: Math.min(s.currentPlayIndex, Math.max(0, playSteps.length - 1)),
+        ...(detected ? { root: detected.root, scale: detected.scale } : {}),
+      };
+    });
   },
 
   clearProgression: () =>

@@ -24,7 +24,9 @@ interface SessionState {
 }
 
 export const useSession = create<SessionState>((set) => ({
-  focus: "timing",
+  // Open on the harmony layer: a default progression is loaded, so the chord chart is the
+  // first thing the user sees (and can edit straight away).
+  focus: "harmony",
   setFocus: (focus) => set({ focus }),
   cycle: (dir) =>
     set((s) => {

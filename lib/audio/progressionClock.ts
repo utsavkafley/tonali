@@ -10,7 +10,11 @@ import { usePlayback } from "@/lib/store/playback";
 
 let part: Tone.Part | null = null;
 
-export async function startProgressionClock(): Promise<void> {
+/**
+ * Start the progression clock, optionally launching at a future offset (e.g. from
+ * mic beat detection). `startDelayMs` = ms from now to the first beat; 0 = immediate.
+ */
+export async function startProgressionClock(startDelayMs = 0): Promise<void> {
   await ensureAudioStarted();
   stopProgressionClock();
 
@@ -42,9 +46,13 @@ export async function startProgressionClock(): Promise<void> {
   (part as any).loopEnd = `${loopEndTicks}i`;
   (part as any).start(0);
 
-  // Start the transport if not already running
+  // Start the transport, scheduled to the beat if a delay was provided
   if (getTransport().state !== "started") {
-    startTransport();
+    if (startDelayMs > 0) {
+      getTransport().start(`+${(startDelayMs / 1000).toFixed(4)}`);
+    } else {
+      startTransport();
+    }
   }
 }
 

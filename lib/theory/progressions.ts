@@ -186,3 +186,60 @@ export function flatBars(chartData: ChartData): Bar[] {
   chartData.systems.forEach((sys) => sys.forEach((sec) => sec.bars.forEach((b) => bars.push(b))));
   return bars;
 }
+
+/** All chords in order (ignoring repeats), for analysis. */
+function allChords(chartData: ChartData): ChordChoice[] {
+  const chords: ChordChoice[] = [];
+  chartData.systems.forEach((sys) =>
+    sys.forEach((sec) => sec.bars.forEach((bar) => bar.forEach((c) => chords.push(c)))),
+  );
+  return chords;
+}
+
+/**
+ * Infer key + a sensible soloing scale from a custom progression (Chords pillar).
+ *  - Key: most frequent chord root; ties broken by the first chord.
+ *  - Scale: mostly dominant 7ths → blues; minor tonic → minor pentatonic;
+ *    jazzy maj7/m7 set → major; otherwise major pentatonic.
+ */
+export function detectKeyScale(chartData: ChartData): { root: string; scale: ScaleId } | null {
+  const chords = allChords(chartData);
+  if (chords.length === 0) return null;
+  const total = chords.length;
+  const dominant = chords.filter((c) => c.type === "7").length;
+
+  // Most frequent root (Map insertion order → first chord wins ties).
+  const counts = new Map<string, number>();
+  for (const c of chords) counts.set(c.root, (counts.get(c.root) ?? 0) + 1);
+  let mostFreq = chords[0].root;
+  let bestN = -1;
+  for (const [r, n] of counts) {
+    if (n > bestN) {
+      bestN = n;
+      mostFreq = r;
+    }
+  }
+
+  // Key: if a root repeats (or it's blues), trust frequency — it's the tonal center.
+  // Otherwise (all roots unique, e.g. ii–V–I) a maj7 marks the tonic; else the first chord.
+  let root: string;
+  if (dominant / total >= 0.5 || bestN > 1) {
+    root = mostFreq;
+  } else {
+    const lastMaj7 = [...chords].reverse().find((c) => c.type === "maj7");
+    root = lastMaj7 ? lastMaj7.root : chords[0].root;
+  }
+
+  const tonicMinor = chords.some(
+    (c) => c.root === root && c.type.startsWith("m") && !c.type.startsWith("maj"),
+  );
+  const jazzy = chords.some((c) => c.type === "maj7" || c.type === "m7");
+
+  let scale: ScaleId;
+  if (dominant / total >= 0.5) scale = "blues";
+  else if (tonicMinor) scale = "minor_pentatonic";
+  else if (jazzy) scale = "major";
+  else scale = "major_pentatonic";
+
+  return { root, scale };
+}

@@ -79,20 +79,28 @@ export function Fretboard() {
     [tuning, fromFret, toFret, context],
   );
 
-  const frets = [];
-  for (let f = fromFret; f <= toFret; f++) frets.push(f);
-  const cols = frets.length;
+  // When the window starts at 0, open strings are shown to the LEFT of the nut as
+  // separate circles — fret 0 is removed from the column grid entirely.
+  const showOpenStrings = fromFret === 0;
+  const boardFrets: number[] = [];
+  for (let f = showOpenStrings ? 1 : fromFret; f <= toFret; f++) boardFrets.push(f);
+  const cols = boardFrets.length;
   const strings = tuning.length;
+
+  const openMarkers = showOpenStrings ? markers.filter((m) => m.fret === 0) : [];
+  const boardMarkers = showOpenStrings ? markers.filter((m) => m.fret > 0) : markers;
 
   const width = PAD_X * 2 + cols * CELL_W;
   const height = PAD_TOP * 2 + (strings - 1) * STRING_GAP + NUM_H;
 
-  // Column index for a fret, flipped for left-handed.
+  // Column index for a board fret (fret ≥ 1 when open strings are shown).
   const colOf = (fret: number) => {
-    const i = fret - fromFret;
+    const i = fret - (showOpenStrings ? 1 : fromFret);
     return handedness === "left" ? cols - 1 - i : i;
   };
   const xCenter = (fret: number) => PAD_X + colOf(fret) * CELL_W + CELL_W / 2;
+  // Open string circles sit at the left edge (right edge when left-handed).
+  const xOpen = handedness === "right" ? PAD_X / 2 : PAD_X + cols * CELL_W + PAD_X / 2;
   // String 0 = low E at the top, high E at the bottom.
   const yString = (s: number) => PAD_TOP + (strings - 1 - s) * STRING_GAP;
   const yMid = PAD_TOP + ((strings - 1) * STRING_GAP) / 2;
@@ -131,7 +139,7 @@ export function Fretboard() {
       aria-label={`${root} ${scale} on the fretboard, frets ${fromFret} to ${toFret}`}
     >
       {/* Inlays (drawn behind everything) */}
-      {frets.map((f) => {
+      {boardFrets.map((f) => {
         const x = xCenter(f);
         if (DOUBLE_INLAYS.includes(f)) {
           return (
@@ -147,11 +155,11 @@ export function Fretboard() {
         return null;
       })}
 
-      {/* Strings (horizontal) */}
+      {/* Strings — extend left to xOpen when open strings are shown */}
       {Array.from({ length: strings }).map((_, s) => (
         <line
           key={`str-${s}`}
-          x1={PAD_X}
+          x1={showOpenStrings ? xOpen : PAD_X}
           y1={yString(s)}
           x2={PAD_X + cols * CELL_W}
           y2={yString(s)}
@@ -179,8 +187,8 @@ export function Fretboard() {
         );
       })}
 
-      {/* Fret numbers */}
-      {frets.map((f) => (
+      {/* Fret numbers (skip 0 — open strings shown separately) */}
+      {boardFrets.map((f) => (
         <text
           key={`num-${f}`}
           x={xCenter(f)}
@@ -195,9 +203,34 @@ export function Fretboard() {
         </text>
       ))}
 
-      {/* Note markers — label shows the degree; hovering flips it to the note name.
-          Roots & chord roots = accent fill; chord tones = solid fill; passing = outlined. */}
-      {markers.map(({ string, fret, note }) => {
+      {/* Open-string indicators — circles to the LEFT of the nut */}
+      {openMarkers.map(({ string, note }) => {
+        const x = xOpen;
+        const y = yString(string);
+        const s = markerStyle(note.role);
+        const key = `open-${string}`;
+        const primary = showDegrees ? note.degree : note.name;
+        const alternate = showDegrees ? note.name : note.degree;
+        const label = hovered === key ? alternate : primary;
+        return (
+          <g
+            key={key}
+            className="cursor-pointer"
+            onMouseEnter={() => setHovered(key)}
+            onMouseLeave={() => setHovered((h) => (h === key ? null : h))}
+          >
+            <circle cx={x} cy={y} r={R} fill={s.fill} stroke={s.stroke}
+              strokeOpacity={s.strokeOpacity} strokeWidth={1.5} />
+            <text x={x} y={y + 0.5} textAnchor="middle" dominantBaseline="central"
+              fontSize={11} fontWeight={s.weight} fill={s.text} fontFamily="monospace">
+              {label}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Fretted note markers */}
+      {boardMarkers.map(({ string, fret, note }) => {
         const x = xCenter(fret);
         const y = yString(string);
         const s = markerStyle(note.role);

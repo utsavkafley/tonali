@@ -88,7 +88,10 @@ export function startMetronome(getConfig: () => MetronomeConfig, onBeat: OnBeat)
 
   const t = getTransport();
   const gridTicks = Math.round(t.PPQ / GRID_PER_BEAT);
-  step = 0;
+  // Seed the step counter from the transport's current position so the click grid stays
+  // phase-locked to bar 1 whether we start from a stopped transport (ticks 0) or join a
+  // progression that's already running on the shared clock.
+  step = Math.round(t.ticks / gridTicks);
 
   scheduleId = t.scheduleRepeat(
     (time) => {

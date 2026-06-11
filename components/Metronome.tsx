@@ -11,6 +11,7 @@ import { usePlayback } from "@/lib/store/playback";
 import { BpmControl } from "@/components/BpmControl";
 import { BeatRow } from "@/components/BeatRow";
 import { MeterControls } from "@/components/MeterControls";
+import { DrumControls } from "@/components/DrumControls";
 
 export function Metronome() {
   const playing = usePlayback((s) => s.playing);
@@ -42,6 +43,7 @@ export function Metronome() {
       <BeatRow />
       <BpmControl />
       <MeterControls />
+      <DrumControls />
     </div>
   );
 }

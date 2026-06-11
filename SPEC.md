@@ -316,6 +316,25 @@ fretboard/chords and show key/scale/chord-tone theory.
 
 ## Changelog
 
+- **v26** — Custom progressions now auto-detect & apply key + scale to the board
+  (`detectKeyScale`): key = most-frequent root (repeat wins; else maj7-as-tonic for ii–V–I,
+  else first chord); scale = dominant-heavy→blues, minor tonic→minor pent, jazzy→major, else
+  major pent. Applied on text-content change only (no-op blurs / manual overrides preserved);
+  key set directly so typed chords aren't transposed. Dropdowns update visibly.
+- **v25** — Mic beat sync. `micSync.ts` opens the mic with echo-cancellation/
+  noise-suppression/autoGain all disabled (critical: defaults would strip the backing
+  track), detects beats from low-frequency kick-drum energy (60–200 Hz), declares BPM
+  stable after 4 consistent beats within 7% variance, predicts the next beat and fires
+  `onStable(bpm, delayMs)`. `progressionClock` accepts a `startDelayMs` arg so the
+  progression launches precisely on that beat. `MicSync` button shows live beat-flash
+  + BPM while listening, auto-launches then stops the mic.
+- **v24** — Built the drum engine. Synthesised AudioBuffers (kick pitch-sweep + click
+  transient, snare noise+body, metallic hi-hat partials, open hi-hat with swell) using the
+  same buffer/player pipeline as real samples — swappable without touching callers. Five
+  genre patterns (Rock, Blues Shuffle, Funk, Jazz, Bossa Nova) in `Tone.Sequence`, live
+  state read per step. Per-instrument mutes, master volume, enable toggle on the Metronome
+  view. Pads wired as drum triggers (kick/snare/hat-c/hat-o); TAP BPM toggle auto-reverts
+  after 2s (as specced since Step 2). Swing set per pattern.
 - **v23** — Built mini-syntax (textarea, newline=system, `|: … :|×N` repeat sections) +
   Slice 3 (progression clock via `Tone.Part`, loops via playSteps). Chart model is now
   `ChartData { systems: SystemLine[] }` with `PlayStep[]` for scheduling. Repeat sections
